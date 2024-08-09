@@ -2,7 +2,7 @@ package flydb
 
 import (
 	"fmt"
-	
+
 	"github.com/oarkflow/filters"
 	"github.com/oarkflow/flydb"
 	"github.com/oarkflow/msgpack"
@@ -24,6 +24,10 @@ func New[K comparable, V any](basePath string, sampleSize int) (storage.Store[K,
 		sampleSize: sampleSize,
 	}
 	return db, nil
+}
+
+func (s *FlyDB[K, V]) Name() string {
+	return "flydb"
 }
 
 func (s *FlyDB[K, V]) Set(key K, value V) error {
@@ -50,6 +54,10 @@ func (s *FlyDB[K, V]) Sample(params storage.SampleParams) (map[string]V, error) 
 	value := make(map[string]V)
 	it := s.client.Items()
 	count := 0
+	var conditions []filters.Condition
+	for _, f := range params.Filters {
+		conditions = append(conditions, f)
+	}
 	for count < sz {
 		key, val, err := it.Next()
 		if err == flydb.ErrIterationDone {
@@ -57,14 +65,14 @@ func (s *FlyDB[K, V]) Sample(params storage.SampleParams) (map[string]V, error) 
 		}
 		data, exists := s.GetData(val)
 		if exists {
-			if params.Sequence != nil {
-				if params.Sequence.Match(data) {
+			if params.Rule != nil {
+				if params.Rule.Match(data) {
 					tmp := fmt.Sprint(key)
 					value[tmp] = data
 					count++
 				}
 			} else if params.Filters != nil {
-				if filters.MatchGroup(val, &filters.FilterGroup{Operator: filters.AND, Filters: params.Filters}) {
+				if filters.MatchGroup(val, &filters.FilterGroup{Operator: filters.AND, Filters: conditions}) {
 					tmp := fmt.Sprint(key)
 					value[tmp] = data
 					count++
