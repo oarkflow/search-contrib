@@ -1,2 +1,4 @@
 .idea
 search-contrib.iml
+examples/*.json
+examples/fts
